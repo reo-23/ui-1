@@ -10,6 +10,22 @@ class CardNewsScreen extends StatefulWidget {
   State<CardNewsScreen> createState() => _CardNewsScreenState();
 }
 
+class _Comment {
+  final String nickname;
+  final String text;
+  final DateTime createdAt;
+  bool liked;
+  int likeCount;
+
+  _Comment({
+    required this.nickname,
+    required this.text,
+    required this.createdAt,
+    this.liked = false,
+    this.likeCount = 0,
+  });
+}
+
 class _CardNewsScreenState extends State<CardNewsScreen> {
   final PageController _pageController = PageController(viewportFraction: 0.88);
   int _currentPage = 0;
@@ -19,6 +35,13 @@ class _CardNewsScreenState extends State<CardNewsScreen> {
   int _likes = 112;
   int _dislikes = 8;
   bool? _myVote; // null=미선택, true=좋아요, false=싫어요
+
+  // 댓글
+  final List<_Comment> _comments = [
+    _Comment(nickname: '법린이', text: '이 법안 정말 필요했어요. 전세사기 피해자로서 희망이 보입니다.', createdAt: DateTime.now().subtract(const Duration(hours: 2)), likeCount: 14),
+    _Comment(nickname: '부동산왕', text: '우선변제권 확대는 좋은데 임대인 입장도 고려해야 하지 않나요?', createdAt: DateTime.now().subtract(const Duration(hours: 1)), likeCount: 7),
+    _Comment(nickname: '월세러', text: '월세도 해당되나요?', createdAt: DateTime.now().subtract(const Duration(minutes: 30)), likeCount: 3),
+  ];
 
   final List<Map<String, dynamic>> _cards = [
     {
@@ -81,12 +104,193 @@ class _CardNewsScreenState extends State<CardNewsScreen> {
         _myVote = null;
       } else {
         if (_myVote != null) {
-          _myVote! ? _likes-- : _dislikes++;
+          _myVote! ? _likes-- : _dislikes--;
         }
         isLike ? _likes++ : _dislikes++;
         _myVote = isLike;
       }
     });
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return '방금';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+    if (diff.inHours < 24) return '${diff.inHours}시간 전';
+    return '${diff.inDays}일 전';
+  }
+
+  void _showCommentSheet() {
+    final textController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.65,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  // 핸들 바
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 4),
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // 헤더
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(
+                      children: [
+                        Text('댓글 ${_comments.length}',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(ctx),
+                          child: const Icon(Icons.close, color: AppColors.textMuted, size: 22),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: AppColors.border),
+                  // 댓글 리스트
+                  Expanded(
+                    child: _comments.isEmpty
+                        ? const Center(
+                      child: Text('아직 댓글이 없습니다.\n첫 댓글을 남겨보세요!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
+                    )
+                        : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      itemCount: _comments.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      itemBuilder: (_, i) {
+                        final c = _comments[i];
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 프로필 아바타
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppColors.navy.withOpacity(0.1),
+                              child: Text(c.nickname[0],
+                                  style: const TextStyle(color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 13)),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(c.nickname,
+                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+                                      const SizedBox(width: 6),
+                                      Text(_timeAgo(c.createdAt),
+                                          style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(c.text,
+                                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.4)),
+                                ],
+                              ),
+                            ),
+                            // 좋아요
+                            GestureDetector(
+                              onTap: () {
+                                setSheetState(() {
+                                  c.liked = !c.liked;
+                                  c.likeCount += c.liked ? 1 : -1;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 8, top: 4),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      c.liked ? Icons.favorite : Icons.favorite_border,
+                                      size: 16,
+                                      color: c.liked ? AppColors.red : AppColors.textMuted,
+                                    ),
+                                    if (c.likeCount > 0)
+                                      Text('${c.likeCount}',
+                                          style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  // 입력창
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: AppColors.border)),
+                    ),
+                    padding: EdgeInsets.only(
+                      left: 16, right: 8, top: 8,
+                      bottom: MediaQuery.of(ctx).viewInsets.bottom + 8,
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: AppColors.navy.withOpacity(0.1),
+                          child: const Icon(Icons.person, color: AppColors.navy, size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: textController,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: '댓글 추가...',
+                              hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            final text = textController.text.trim();
+                            if (text.isEmpty) return;
+                            setSheetState(() {
+                              _comments.add(_Comment(
+                                nickname: '나',
+                                text: text,
+                                createdAt: DateTime.now(),
+                              ));
+                            });
+                            setState(() {}); // 메인 화면 댓글 수 갱신
+                            textController.clear();
+                          },
+                          icon: const Icon(Icons.send_rounded, color: AppColors.navy, size: 22),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -297,18 +501,20 @@ class _CardNewsScreenState extends State<CardNewsScreen> {
                   const SizedBox(width: 16),
                   // 댓글
                   GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('댓글 기능은 준비 중입니다 💬'), duration: Duration(seconds: 1)),
-                      );
-                    },
+                    onTap: () => _showCommentSheet(),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withOpacity(0.08),
                       ),
-                      child: const Text('💬', style: TextStyle(fontSize: 22)),
+                      child: Column(
+                        children: [
+                          const Text('💬', style: TextStyle(fontSize: 22)),
+                          Text('${_comments.length}',
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
                     ),
                   ),
                 ],
